@@ -1,6 +1,7 @@
 import type { MetaFunction } from "react-router"
 import { useLoaderData } from "react-router"
 import type { Route } from "../+types/root"
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import type { Resource } from "../localization/resource"
 import { convertDateToUserTz } from "../utils/dates"
 
@@ -47,11 +48,17 @@ export default function Index() {
 	}
 
 	return (
-		<div>
-			<h1>This is the new Starter Kit</h1>
-			<p>URL: {myurl}</p>
-			<p>Current Date: {currentDate.toString()}</p>
-			<p>Resource example: {resourceExample.common.hi}</p>
+		<div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 p-4 dark:from-blue-950 dark:to-blue-900 dark:text-white">
+			<Card>
+				<CardHeader>
+					<CardTitle>This is the new Starter Kit</CardTitle>
+				</CardHeader>
+				<CardContent>
+					<p>URL: {myurl}</p>
+					<p>Current Date: {currentDate.toString()}</p>
+					<p>Resource example: {resourceExample.common.hi}</p>
+				</CardContent>
+			</Card>
 		</div>
 	)
 }

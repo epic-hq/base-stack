@@ -1,5 +1,6 @@
 import type { SVGProps } from "react"
 import { cn } from "~/utils/css"
+// @ts-ignore - SVG import
 import spriteHref from "./icons/icon.svg"
 import type { IconName } from "./icons/types"
 
