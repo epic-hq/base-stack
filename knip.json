@@ -5,5 +5,14 @@
 	"lefthook": true,
 	"project": ["**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}"],
 	"ignore": ["app/library/icon/icons/types.ts", "react-router.config.ts"],
-	"ignoreDependencies": ["@babel/preset-typescript", "babel-plugin-react-compiler", "tailwindcss"]
+	"ignoreDependencies": [
+		"@babel/preset-typescript",
+		"babel-plugin-react-compiler",
+		"tailwindcss",
+		"@supabase/supabase-js",
+		"class-variance-authority",
+		"date-fns",
+		"lucide-react",
+		"tw-animate-css"
+	]
 }

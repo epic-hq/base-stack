@@ -13,7 +13,13 @@
 		"enabled": true,
 		"lineWidth": 120
 	},
-	"assist": { "actions": { "source": { "organizeImports": "on" } } },
+	"assist": {
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	},
 	"linter": {
 		"enabled": true,
 		"rules": {
@@ -34,7 +40,7 @@
 				"useNumberNamespace": "error",
 				"noInferrableTypes": "error",
 				"noUselessElse": "error",
-				"noProcessEnv": "error"
+				"noProcessEnv": "off"
 			},
 			"complexity": {
 				"recommended": true

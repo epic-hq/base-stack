@@ -1,12 +1,6 @@
+# Welcome to Jett and Rick's Starter Kit
 
-<p align="middle">
-<img  width="900px" height="500px" src="./public/base-stack.png" />
-</p>
-
-# Welcome to Forge 42 base-stack
-
-This is a base-stack for Forge 42 projects. This stack is a starting point for all Forge 42 stacks with more
-advanced features. This is an ESM Vite stack with Remix.run / React Router v7.
+Based on a base-stack for Forge 42 projects. This is an ESM Vite stack with Remix.run / React Router v7.
 
 It includes a basic setup for a project with react-router v7 framework mode and:
 
@@ -58,6 +52,11 @@ The server comes preconfigured with:
 
 In order to add your own middleware, extend the context, or anything along those lines, all you have to do is edit the server
 inside the `entry.server.tsx` file.
+
+## Encrypted .env Files (dotenvx)
+
+This stack uses dotenvx to encrypt your .env files. More information about dotenvx can be found [here](https://dotenvx.com/).
+We are committing .env.production and .env.example to the repository.
 
 ## .env handling
 

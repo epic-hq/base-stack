@@ -4,6 +4,7 @@ import type { Route } from "../+types/root"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import type { Resource } from "../localization/resource"
 import { convertDateToUserTz } from "../utils/dates"
+import "@dotenvx/dotenvx/config"
 
 export const meta: MetaFunction = () => {
 	return [{ title: "New Remix App" }, { name: "description", content: "Welcome to Remix!" }]
@@ -12,11 +13,20 @@ export const meta: MetaFunction = () => {
 export async function loader(args: Route.LoaderArgs) {
 	const now = new Date()
 	const userDate = convertDateToUserTz(now, args.request)
-	return { myurl: args.request.url, currentDate: userDate }
+	// Get environment variables from context
+	const { clientEnv } = args.context
+	// console.log("clientEnv", clientEnv)
+	// console.debug(`process.env.SUPABASE_URL: ${process.env.SUPABASE_URL}`)
+	return {
+		myurl: args.request.url,
+		currentDate: userDate,
+		// Access environment variables from server context instead of process.env
+		helloValue: clientEnv ? (clientEnv as Record<string, string>).HELLO || "Not set" : "Not available",
+	}
 }
 
 export default function Index() {
-	const { myurl, currentDate } = useLoaderData()
+	const { myurl, currentDate, helloValue } = useLoaderData()
 
 	// Using Resource type for type checking
 	const resourceExample: Resource = {
@@ -57,6 +67,7 @@ export default function Index() {
 					<p>URL: {myurl}</p>
 					<p>Current Date: {currentDate.toString()}</p>
 					<p>Resource example: {resourceExample.common.hi}</p>
+					<p>Environment variable HELLO: {helloValue}</p>
 				</CardContent>
 			</Card>
 		</div>

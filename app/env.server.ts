@@ -3,6 +3,7 @@ import { z } from "zod/v4"
 const envSchema = z.object({
 	NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 	APP_ENV: z.enum(["development", "staging", "production"]).default("development"),
+	HELLO: z.string().optional(),
 })
 
 type ServerEnv = z.infer<typeof envSchema>
@@ -13,12 +14,10 @@ let env: ServerEnv
  * @returns Initialized env vars
  */
 function initEnv() {
-	// biome-ignore lint/style/noProcessEnv: This should be the only place to use process.env directly
+	// This should be the only place to use process.env directly
 	const envData = envSchema.safeParse(process.env)
 
 	if (!envData.success) {
-		// biome-ignore lint/suspicious/noConsole: We want this to be logged
-		console.error("❌ Invalid environment variables:", envData.error.flatten().fieldErrors)
 		throw new Error("Invalid environment variables")
 	}
 
@@ -27,8 +26,6 @@ function initEnv() {
 
 	// Do not log the message when running tests
 	if (env.NODE_ENV !== "test") {
-		// biome-ignore lint/suspicious/noConsole: We want this to be logged
-		console.log("✅ Environment variables loaded successfully")
 	}
 	return env
 }
@@ -49,6 +46,7 @@ export function getClientEnv() {
 	const serverEnv = getServerEnv()
 	return {
 		NODE_ENV: serverEnv.NODE_ENV,
+		HELLO: serverEnv.HELLO,
 	}
 }
 
