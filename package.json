@@ -115,6 +115,7 @@
     "langfuse-vercel": "3.38.5",
     "lucide-react": "0.525.0",
     "motion": "12.23.12",
+    "node": "25.0.0",
     "openai": "5.12.2",
     "posthog-js": "1.261.0",
     "posthog-node": "4.18.0",
