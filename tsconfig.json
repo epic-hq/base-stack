@@ -1,11 +1,19 @@
 {
-	"include": ["env.d.ts", "**/*.ts", "**/*.tsx", "**/**/.server/**/*.ts", ".react-router/types/**/*"],
+  "include": [
+    "env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "**/**/.server/**/*.ts",
+    ".react-router/types/**/*",
+    "trigger.config.ts"
+  ],
 	"compilerOptions": {
 		"types": ["vitest/globals", "@vitest/browser/providers/playwright"],
 		"lib": ["DOM", "DOM.Iterable", "ES2023"],
 		"isolatedModules": true,
 		"esModuleInterop": true,
 		"jsx": "react-jsx",
+		"experimentalDecorators": true,
 		"module": "ESNext",
 		"moduleResolution": "Bundler",
 		"resolveJsonModule": true,
@@ -16,7 +24,11 @@
 		"forceConsistentCasingInFileNames": true,
 		"baseUrl": ".",
 		"paths": {
-			"~/*": ["./app/*"]
+			"~/*": ["./app/*"],
+			"@/*": ["./app/*"],
+			".storybook/*": ["./.storybook/*"],
+			"baml": ["./baml_client/index.ts"],
+			"baml/*": ["./baml_client/*"]
 		},
 		"rootDirs": [".", "./.react-router/types"],
 		"plugins": [{ "name": "@react-router/dev" }],

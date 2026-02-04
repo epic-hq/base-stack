@@ -1,0 +1,696 @@
+# Interview Insights – User Flow
+
+## Business Level
+
+Looking at your current **flow** (Goal → Key Decisions → What to Learn → Questions for Users → Evidence), here are the **user’s key business problems** along the way and ideas to **reduce friction + delight**:
+
+---
+
+## 1. Defining the Goal
+
+**Problem:** Users may struggle to phrase a clear goal.
+**Delight Ideas:**
+
+* **Templates & examples** (e.g., “Boost newsletter engagement,” “Reduce checkout drop-offs”).
+* **Smart suggestions**: AI reformulates their rough text into a crisp goal.
+* **Mini goal library**: pick from common goals in SaaS, e-commerce, CPG, etc.
+
+---
+
+## 2. Turning Goals into Key Decisions
+
+**Problem:** People often don’t know what decisions they *should* be making.
+**Delight Ideas:**
+
+* **Auto-generated decision questions** with tooltips (“This is the big choice you’ll face”).
+* **Scenario preview**: show how different decisions could play out.
+* **Confidence meter**: indicate if a decision has weak or strong existing evidence.
+
+---
+
+## 3. Breaking into “What to Learn”
+
+**Problem:** Users may not see the link between decisions and research questions.
+**Delight Ideas:**
+
+* **Visual map** (graph view): Goal → Decisions → Learn → Ask.
+* **Coverage tracker**: highlight “We don’t have any way to learn about X yet.”
+* **Suggestions from prior data**: pull relevant insights/reports automatically.
+
+---
+
+## 4. Getting the Questions for Users (Interview Prompts)
+
+**Problem:** Teams don’t know how to phrase unbiased, effective prompts.
+**Delight Ideas:**
+
+* **Prompt builder with bias checks**: red flag if leading/yes-no question.
+* **Auto-translate to plain voice**: adapt formal RQs into natural prompts.
+* **Preview mode**: simulate how a participant might answer.
+
+---
+
+## 5. Gathering the Users / Data
+
+**Problem:** They need participants, not just questions.
+**Delight Ideas:**
+
+* **Recruitment helpers**:
+
+  * Pull from CRM/email lists.
+  * Auto-generate outreach messages (“Want to join a 20-min test?”).
+  * Incentive tracker (gift cards, discounts).
+* **Async input**: allow users to answer via quick polls or embedded survey links.
+* **Leverage “Research Docs”**: upload GA4 logs, surveys, A/B results as additional evidence sources.
+
+---
+
+## 6. Synthesizing Evidence
+
+**Problem:** Overwhelm from raw notes/logs.
+**Delight Ideas:**
+
+* **Smart clustering**: auto-group answers by theme/persona.
+* **Evidence-to-decision roll-up**: “This finding supports Decision A.”
+* **Delightful chips**: color-coded supports/refutes tags, quick filters.
+
+---
+
+## 7. Closing the Loop
+
+**Problem:** Users may feel “So what?” after seeing insights.
+**Delight Ideas:**
+
+* **Answer cards**: Each decision has a status (Answered / Partial / Unknown).
+* **Next steps nudges**: Suggest experiments or additional encounters.
+* **Shareable storyboards**: export findings to slides for execs.
+
+---
+
+## Validation Mode Flow (Pain → Awareness → Quantified → Acting)
+
+When a project switches to validation mode we tighten the pipeline so every interview explicitly feeds the four gates.
+
+1. **Structure generation** – `GenerateResearchStructure` produces the four canonical research questions (`pain_exists`, `awareness`, `quantified`, `acting`). We map those slugs to real UUIDs and persist the mapping in `project_sections.questions.meta.validation_gate_map`.
+2. **Prompt creation** – `api.generate-questions` forwards the `research_mode` flag to BAML. Interview prompts inherit the gate slug in their `category`, so prompts, questions, and downstream analytics stay aligned.
+3. **Evidence analysis** – `runEvidenceAnalysis` detects validation mode, injects the gate mapping into the LLM prompt, and records `respondent_person_id` on each synthesized `project_answer`. Every answer now points back to the correct validation gate.
+4. **Dashboard** – the Validation Status screen reads the gate map, pulls the latest `project_answers`, and renders real findings per participant instead of the legacy mock data / regex heuristic. Outcome badges walk the funnel from “No Signal” to “Taking Action”.
+5. **Fallbacks** – when a project isn’t in validation mode (or the gate map hasn’t been generated yet) we gracefully fall back to the heuristic view so the page still loads.
+
+Result: generating a validation plan → running interviews → opening the validation dashboard now shows live, per-gate evidence with zero manual stitching.
+
+---
+
+💡 **For getting the *users*** (your question):
+Add a **“Recruit Participants” button** next to Encounters. When clicked:
+
+* Options:
+
+  * Upload contact list.
+  * Generate recruitment email.
+  * Post quick survey link.
+* Show **progress bar**: “5 of 10 target interviews scheduled.”
+* Integrate with People section → auto-tag stakeholders / participants.
+
+---
+
+## Examples
+
+## 1. Updated UI Flow (plain terms)
+
+* **Step 1 → “What do you want to achieve?”** (Goal)
+* **Step 2 → “What big choices do you need to make?”** (Key Decisions / DQs)
+* **Step 3 → “What do you need to learn?”** (Things to Find Out / RQs)
+* **Step 4 → “What will you ask people?”** (Questions for Users / IPs)
+
+Tooltips can still show the formal names (Decision Question, Research Question, Interview Prompt).
+
+---
+
+## 2. Four Example Use Cases
+
+### A) Generating Content (Marketing Team)
+
+* **Goal:** Boost engagement with weekly newsletter.
+* **Key Decisions:**
+
+  * Which topics resonate most with subscribers?
+  * Should we use more video vs. text content?
+* **What to Learn:**
+
+  * What topics subscribers actually click on.
+  * How people prefer to consume marketing content.
+* **Questions for Users:**
+
+  * “What was the last newsletter you opened and why?”
+  * “Do you prefer short videos, articles, or quick tips?”
+
+---
+
+### B) Finding PMF for SaaS App (Startup Team)
+
+* **Goal:** Validate product–market fit for task automation app.
+* **Key Decisions:**
+
+  * Does our app solve a real, painful problem?
+  * Who are the early adopter segments?
+* **What to Learn:**
+
+  * What tasks people currently automate or struggle with.
+  * Which roles or industries feel the pain strongest.
+* **Questions for Users:**
+
+  * “Tell me about the last time you wished a task could be automated.”
+  * “What tools do you use now to handle repetitive work?”
+
+---
+
+### C) Testing a New Business Idea (Founder)
+
+* **Goal:** Explore viability of subscription meal-kit for athletes.
+* **Key Decisions:**
+
+  * Is the market willing to pay for specialized nutrition?
+  * Which features (speed, customization, price) matter most?
+* **What to Learn:**
+
+  * Athletes’ current eating habits and struggles.
+  * How much they spend on supplements and prepared meals.
+* **Questions for Users:**
+
+  * “Walk me through your typical week of meals.”
+  * “If you had a subscription that handled nutrition, what would be must-have vs. nice-to-have?”
+
+---
+
+### D) Increasing Community Usage & Referrals (Community Manager)
+
+* **Goal:** Grow active participation in an online founder community.
+* **Key Decisions:**
+
+  * What makes members post and refer others?
+  * Which incentives or formats drive stickiness?
+* **What to Learn:**
+
+  * Why members engage or drop off.
+  * Which referral benefits feel motivating.
+* **Questions for Users:**
+
+  * “When was the last time you invited someone to join a community? What made you do it?”
+  * “What makes you post or comment vs. just read silently?”
+
+
+---
+
+## Primary Journey (PM uploads new research. Detailed. July)
+
+```mermaid
+graph TD
+  A[Login / Dashboard] --> B[Create Study]
+  B --> C[Upload Interview Recording]
+  C --> D[Processing Queue]\nTranscribe → Generate Insights
+  D --> E[Interview Detail – Insight Cards]
+  E --> F[Dashboard Aggregation]
+  F --> G[Persona View]
+  F --> H[Theme Matrix]
+  H --> I[Opportunity Backlog]
+```
+
+### Step Descriptions
+|#| Screen | Goal | Key Actions |
+|-|-|-|-|
+|1| Login / Dashboard | Access workspace | Auth (Supabase) → see list of studies |
+|2| Create Study | New research project | Name study, set context meta |
+|3| Upload Recording | Add raw data | Drag-n-drop file(s), show progress |
+|4| Processing Queue | Background tasks | Real-time status chips (Queued/Done) |
+|5| Interview Detail | Investigate a single session | Review Insight Cards, edit tags |
+|6| Dashboard | Aggregate insights | Filter by persona/theme/opportunity, sticky KPI bar, 12-column grid layout, interactive filtering |
+|7| Persona View | Understand segments | Auto-generated profiles + top quotes |
+|8| Theme Matrix | Impact vs Novelty heat-map | Click cell → list supporting insights |
+|9| Opportunity Backlog | Bridge to delivery | Prioritised table, export to CSV |
+
+### Alternate Flows
+* **Add More Interviews** – from Dashboard, hit “Upload More”.
+* **Edit Insight** – from Card actions, opens modal with JSON fields.
+* **Share Link** – read-only permalink with Dashboard filters encoded.
+* **Filter Insights** – click on tags/categories in Insight cards to filter by related content.
+* **Drag-and-Drop Opportunities** – reorder and move opportunity cards between kanban columns.
+* **Navigate to List Views** – click on KPI cards or section headers to view detailed list pages.
+
+---
+
+## Navigation
+Problem: We have too many things, and no clear flow.
+HMW: guide user better to Wow and reduce clutter
+
+- [ ] Desktop version: Top bar or sidenav?
+
+First interaction. How long does it take to get to Wow? After a User uploads an interview, the priority is to understand the target market, people & personas. Then dig into the top themes for the target personas, how much evidence is there, and who resonates with it. Then formulate insights we can validate or act upon
+
+So a lean menu in both mobile and desktop could look like this, with (items) appearing on page or as subnav.
+
+1. Research (status, recommendations, questions, experiments, transcripts, add interviews, surveys) - define goals & get the evidence
+2. Personas (people, interviews, evidence, themes, personas x themes) - analyze people & what makes them tick
+3. Patterns (themes, themes x personas) - what are the signals we are getting, the top themes, how much evidence is there, and who resonates with it. Then formulate insights we can validate or act upon
+4. Insights & Opportunities (future) - what are the insights we can validate or act upon & next steps
+
+Global: Workspace switcher ▸ Projects ▸ Settings/Team
+
+
+---
+
+## UX Decisions (resolved)
+
+
+## Interview Data Flow (2025 Update)
+
+| Step | Route/Function/Component | Purpose | Data Storage | Key Relationships |
+|------|-------------------------|---------|--------------|-------------------|
+| 1 | [`app/components/questions/InterviewQuestionsManager.tsx`](app/components/questions/InterviewQuestionsManager.tsx) | Plan, generate, edit, and organize interview questions | `interview_prompts`, `project_answers` | Questions linked to project, can be associated with interviews via `prompt_id`/`question_id` |
+| 2 | [`app/features/interviews/pages/new.tsx`](app/features/interviews/pages/new.tsx) | Create a new interview, assign participants, set meta | `interviews` | Interview linked to project, account, and optionally people (participants) |
+| 3 | [`app/routes/api.upload-file.tsx`](app/routes/api.upload-file.tsx:13) | Upload interview recording (audio/video) | File storage (media), `interviews.media_url` | Uploaded file URL saved to interview record |
+| 4 | [`app/routes/api.interview-transcript.tsx`](app/routes/api.interview-transcript.tsx:5) | Transcribe uploaded media, attach transcript to interview | `interviews.transcript`, `interviews.transcript_formatted` | Transcript linked to interview, used for downstream analysis |
+| 5 | [`app/routes/api.trigger-analysis.tsx`](app/routes/api.trigger-analysis.tsx:5) | Trigger LLM/AI analysis on transcript | `evidence`, `project_answers`, `project_answer_evidence` | Extracted evidence/answers linked to interview, project, and optionally to questions |
+| 6 | [`app/features/interviews/pages/detail.tsx`](app/features/interviews/pages/detail.tsx) | View interview details, evidence, empathy map, insights | Reads from `interviews`, `evidence`, `project_answers` | UI aggregates all related data for a single interview |
+| 7 | [`app/features/interviews/pages/index.tsx`](app/features/interviews/pages/index.tsx) | List all interviews for a project | Reads from `interviews` | Aggregates interviews by project/account |
+
+<!-- MERMAID diagram is broken. fix -->
+
+### Recommendations for Interview Data Flow Improvements (2025 Review)
+
+**Strengths:**
+- Data is highly normalized, with clear separation between interviews, answers, and evidence.
+- All entities are project/account scoped with RLS, supporting multi-tenancy and security.
+- The flow from question planning to evidence extraction is explicit and traceable.
+- Empathy map facets and rich metadata on evidence support advanced analysis.
+
+**Potential Improvements:**
+1. **Transcript Chunking:**
+   - If interviews become very long, consider normalizing transcript storage (e.g., `transcript_chunks` table) for more granular evidence mapping and efficient querying.
+   - This is already hinted at in `project_answer_evidence.transcript_chunk_id` but not yet implemented.
+
+2. **Explicit People/Participant Linking:**
+   - While interviews can reference participants, consider a junction table for `interview_people` to support multi-participant interviews and richer role tracking (speaker, observer, etc.).
+   - This would align with the `evidence_people` pattern.
+
+3. **Evidence Provenance:**
+   - Consider tracking the exact LLM/model version or pipeline used for evidence extraction in the `evidence` table for auditability and reproducibility.
+
+4. **Error Handling & Status:**
+   - The `interviews.status` enum is robust, but consider adding more granular error codes or logs for failed uploads/transcriptions/analyses to aid debugging.
+
+5. **UI/UX:**
+   - Consider adding a visual "data lineage" or "evidence trace" feature in the UI, so users can click from an insight/evidence unit back to the original transcript/audio segment and question.
+
+6. **API Consistency:**
+   - Ensure all API endpoints return consistent error structures and status codes, especially for file upload and analysis triggers.
+
+7. **Documentation:**
+   - Keep this flow diagram and table up to date in both user and developer docs, and add a section on "How evidence is linked to interviews and questions" for advanced users.
+
+---
+
+## Deep Interview Data Flow (Technical, 2025)
+
+| Step | Route/Function/Component | Purpose | Data Storage | Key Relationships |
+|------|-------------------------|---------|--------------|-------------------|
+| 1 | [`InterviewQuestionsManager.tsx`](app/components/questions/InterviewQuestionsManager.tsx) | Plan, generate, edit, and organize interview questions | `interview_prompts`, `project_answers` | Questions linked to project, can be associated with interviews via `prompt_id`/`question_id` |
+| 2 | [`new.tsx`](app/features/interviews/pages/new.tsx) | Create a new interview, assign participants, set meta | `interviews` | Interview linked to project, account, and optionally people (participants) |
+| 3 | [`api.upload-file.tsx`](app/routes/api.upload-file.tsx:13) | Upload interview recording (audio/video) | File storage (media), `interviews.media_url` | Uploaded file URL saved to interview record |
+| 4 | [`api.interview-transcript.tsx`](app/routes/api.interview-transcript.tsx:5) | Transcribe uploaded media, attach transcript to interview | `interviews.transcript`, `interviews.transcript_formatted` | Transcript linked to interview, used for downstream analysis |
+| 5 | [`api.process-interview-internal.tsx`](app/routes/api.process-interview-internal.tsx:13) + [`processInterview.server.ts`](app/utils/processInterview.server.ts:108) | **Extract evidence units from transcript (BAML), insert into `evidence`, resolve facets, link to people, answers, and personas** | `evidence`, `evidence_facet`, `evidence_people`, `project_answers`, `people`, `personas`, `people_personas` | Evidence linked to interview, project, person, persona, and mapped to answers by facet kind. Answers link to prompts, RQ, DQ, research_goal via `question_id`/`question_category` |
+| 6 | [`project-answers.server.ts`](app/lib/database/project-answers.server.ts) | Maintain answer records for each interview/question | `project_answers` | Answers linked to interview, question, person, and evidence |
+| 7 | [`interview_people`](supabase/schemas/21_interview_people.sql), [`people_personas`](supabase/schemas/60_persona_distribution_view.sql) | Maintain person and persona relationships | `interview_people`, `people_personas` | Person linked to interview and persona, persona assigned via BAML |
+| 8 | [`detail.tsx`](app/features/interviews/pages/detail.tsx) | View interview details, evidence, empathy map, insights | Reads from all above | UI aggregates all related data for a single interview |
+| 9 | [`index.tsx`](app/features/interviews/pages/index.tsx) | List all interviews for a project | Reads from `interviews` | Aggregates interviews by project/account |
+
+```mermaid
+flowchart TD
+    Q[InterviewQuestionsManager<br/>(Plan Questions)] --> N[NewInterviewPage<br/>(Create Interview)]
+    N --> U[UploadFileAPI<br/>(Upload Recording)]
+    U --> T[InterviewTranscriptAPI<br/>(Transcribe)]
+    T --> P[ProcessInterviewInternal<br/>(Extract Evidence, Map Answers)]
+    P --> E[Evidence Table]
+    P --> PA[Project Answers]
+    P --> Pe[People]
+    P --> PeP[Personas]
+    P --> EP[EvidencePeople]
+    P --> EF[EvidenceFacet]
+    P --> PP[PeoplePersonas]
+    E --> D[InterviewDetailPage<br/>(View Insights, Empathy Map)]
+    PA --> D
+    Pe --> D
+    PeP --> D
+    EP --> D
+    ET --> D
+    PP --> D
+    D --> X[InterviewsIndexPage<br/>(Project Interview List)]
+
+    subgraph Data
+      I[interviews]
+      J[interview_prompts]
+      K[project_answers]
+      L[evidence]
+      M[evidence_facet]
+      N[evidence_people]
+      O[personas]
+      P[people]
+      Q[people_personas]
+    end
+
+    N -- saves --> I
+    Q -- saves --> J
+    P -- saves --> L
+    P -- saves --> K
+    P -- saves --> M
+    P -- saves --> N
+    P -- saves --> O
+    P -- saves --> P
+    P -- saves --> Q
+    D -- reads --> I
+    D -- reads --> L
+    D -- reads --> K
+    D -- reads --> M
+    D -- reads --> N
+    D -- reads --> O
+    D -- reads --> P
+    D -- reads --> Q
+    X -- reads --> I
+```
+
+### Data Flow for KeyDecisionsCard
+
+The `KeyDecisionsCard` component displays a summary of Decision Questions (DQs), their linked Research Questions (RQs), and supporting answers/evidence from interviews. The data flow is as follows:
+
+- **Decision Questions (DQs):**
+  - Table: `decision_questions`
+  - Queried via: `decision_question_summary`
+  - Key field: `id` (decision_question_id)
+- **Research Questions (RQs):**
+  - Table: `research_questions`
+  - Linked to DQ via: `decision_question_id`
+  - Queried via: `research_question_summary`
+  - Key field: `id` (research_question_id)
+- **Answers:**
+  - Table: `project_answers`
+  - Linked to RQ via: `research_question_id`
+  - Linked to DQ via: `decision_question_id`
+  - Linked to interview via: `interview_id`
+  - Linked to respondent via: `respondent_person_id`
+- **Evidence:**
+  - Table: `evidence`
+  - Linked to answer via: `project_answer_id`
+  - Contains verbatim, support, anchors, etc.
+- **Analysis Snapshots:**
+  - Table: `project_research_analysis_runs`
+  - Table: `project_question_analysis`
+  - Store AI-generated summaries, confidence, and next steps for each DQ/RQ run
+
+**Data Assembly:**
+- For each DQ, find all RQs (`research_questions` where `decision_question_id` matches).
+- For each RQ, find all answers (`project_answers` where `research_question_id` matches).
+- For each answer, find all evidence (`evidence` where `project_answer_id` matches).
+- For each answer, join interview and respondent for context.
+
+**Diagram:**
+```mermaid
+flowchart TD
+  DQ[Decision Question] --> RQ[Research Question]
+  RQ --> A[Project Answer]
+  A --> E[Evidence]
+  A --> I[Interview]
+  A --> P[Person]
+```
+
+**Relevant DB Fields:**
+- `decision_questions.id` → `research_questions.decision_question_id`
+- `research_questions.id` → `project_answers.research_question_id`
+- `decision_questions.id` → `project_answers.decision_question_id`
+- `project_answers.id` → `evidence.project_answer_id`
+- `project_answers.interview_id` → `interviews.id`
+- `project_answers.respondent_person_id` → `people.id`
+
+This structure ensures that every Key Decision is traceable to the research questions, answers, and evidence that support it, with full interview and respondent context.
+
+### Why Does KeyDecisionsCard Prompt to Create a Plan First?
+
+The `KeyDecisionsCard` component is displayed within the `ProjectStatusScreen` only if the project has defined research goals or plan sections. This is determined by the presence of project sections of kind `"goal"` or `"research_goal"`.
+
+- The helper function `getGoalSections()` filters the project's sections for these kinds.
+- If no such sections exist, the UI does not render the KeyDecisionsCard and instead prompts the user to create a plan first.
+- This "plan" is not represented by a single `plan_id` field but rather by the presence of these goal-related project sections.
+- Creating a plan means adding at least one project section with kind `"goal"` or `"research_goal"`, which defines the research objectives.
+- Once a plan exists, the KeyDecisionsCard can display linked Decision Questions, Research Questions, and supporting answers/evidence.
+
+This design encourages users to explicitly define their research goals before diving into detailed analysis, ensuring alignment and context for the insights.
+
+---
+
+**Summary:**
+- No direct `plan_id` field is used.
+- The "plan" is modeled as project sections of kind `"goal"` or `"research_goal"`.
+- KeyDecisionsCard requires these sections to show meaningful data.
+
+---
+
+## Research Structure Management System (2025 Update)
+
+### Overview
+A comprehensive system for managing Decision Questions (DQs) and Research Questions (RQs) with database persistence, evidence analysis, and progress tracking.
+
+### Key Components
+
+#### 1. Research Structure Manager (`ResearchStructureManager.tsx`)
+**Purpose:** Define and edit Decision Questions and Research Questions before generating interview prompts.
+
+**Features:**
+- ✅ **Real-time Database Persistence**: All edits to DQs and RQs are immediately saved to database via PATCH API
+- ✅ **Inline Editing**: Click-to-edit functionality for question text and rationale
+- ✅ **AI-Powered Generation**: Generate structured research questions from project goals
+- ✅ **Proper Route Integration**: Uses `useProjectRoutes` for navigation to project setup
+
+**Database Integration:**
+- `decision_questions` table for key decisions
+- `research_questions` table for research questions (linked to DQs)
+- PATCH API at `/api/questions/{id}` supports updating all question types
+
+#### 2. Research Workflow Page (`research-workflow.tsx`)
+**Purpose:** Simplified, unified interface for research planning.
+
+**Features:**
+- ✅ **Simplified UI**: Removed complex stepper navigation
+- ✅ **Single Page Flow**: Shows both ResearchStructureManager and InterviewQuestionsManager
+- ✅ **Clean Navigation**: Minimal header with project name only
+- ✅ **Accessible Route**: Available at `/questions/research-workflow`
+
+#### 3. Research Evidence Analysis (`api.analyze-research-evidence.tsx`)
+**Purpose:** Analyze evidence and create traceable connections to research questions.
+
+**Features:**
+- ✅ **Evidence-to-Question Linking**: Keyword matching algorithm links evidence to relevant DQs and RQs
+- ✅ **Project Answers Creation**: Creates `project_answers` entries for traceable research progress
+- ✅ **Confidence Scoring**: Assigns confidence levels to evidence-question connections
+- ✅ **Analysis Metrics**: Returns summary of evidence analyzed and connections made
+
+**Data Flow:**
+```
+Evidence → Analysis → Project Answers → Research Questions → Decision Questions
+```
+
+#### 4. Enhanced Project Status Screen (`ProjectStatusScreen.tsx`)
+**Purpose:** Comprehensive view of research progress with detailed answers.
+
+**Features:**
+- ✅ **Key Decisions Summary**: Shows DQ and RQ counts with answer status
+- ✅ **Research Answers Detail**: Full `ResearchAnswers` component for detailed progress
+- ✅ **Navigation Links**: Direct link to research workflow management
+- ✅ **Progress Tracking**: Visual indicators for answered vs. open questions
+
+#### 5. Navigatable Onboarding Stepper (`OnboardingStepper.tsx`)
+**Purpose:** Allow users to navigate between onboarding steps directly.
+
+**Features:**
+- ✅ **Clickable Steps**: Each step has `href` property for direct navigation
+- ✅ **Route Integration**: Uses proper project routes for navigation
+- ✅ **Visual Progress**: Shows completed, current, and upcoming steps
+
+**Step Navigation:**
+- **Project Goals** → `/setup`
+- **Questions** → `/questions`
+- **Upload** → `/interviews/upload`
+
+### Technical Architecture
+
+#### Database Schema
+```sql
+-- Decision Questions (DQs)
+decision_questions:
+  - id (primary key)
+  - project_id (foreign key)
+  - text (question text)
+  - rationale (explanation)
+  - order_index (for ordering)
+
+-- Research Questions (RQs) 
+research_questions:
+  - id (primary key)
+  - project_id (foreign key)
+  - decision_question_id (foreign key to DQ)
+  - text (question text)
+  - rationale (explanation)
+  - order_index (for ordering)
+
+-- Project Answers (links evidence to questions)
+project_answers:
+  - id (primary key)
+  - project_id (foreign key)
+  - interview_id (foreign key)
+  - research_question_id (foreign key)
+  - decision_question_id (foreign key)
+  - answer_text (evidence text)
+  - confidence_level (0.0-1.0)
+  - status (answered/pending)
+```
+
+#### API Endpoints
+- **PATCH `/api/questions/{id}`**: Update DQ, RQ, or interview prompt
+- **POST `/api/analyze-research-evidence`**: Analyze evidence and link to questions
+- **GET `/questions/research-workflow`**: Research structure management page
+
+#### Route Structure
+```typescript
+routes.questions = {
+  index: () => `${base}/questions`,
+  researchWorkflow: () => `${base}/questions/research-workflow`,
+  // ... other routes
+}
+```
+
+### User Experience Improvements
+
+#### Before (Issues)
+- ❌ Editing DQs/RQs only updated local state, no database persistence
+- ❌ Complex stepper UI with nested navigation
+- ❌ No evidence analysis or traceability
+- ❌ Limited research progress visibility
+- ❌ Non-navigatable onboarding steps
+
+#### After (Solutions)
+- ✅ **Immediate Database Persistence**: All edits save to database with user feedback
+- ✅ **Simplified Interface**: Clean, single-page research workflow
+- ✅ **Evidence Traceability**: Complete evidence → question → decision pipeline
+- ✅ **Comprehensive Progress Tracking**: Detailed view of research status
+- ✅ **Intuitive Navigation**: Clickable stepper and proper route integration
+
+### Files Modified
+1. **`ResearchStructureManager.tsx`** - Added database persistence and route integration
+2. **`api.questions.$questionId.tsx`** - Added PATCH support for multiple table types
+3. **`research-workflow.tsx`** - Simplified UI structure, removed stepper complexity
+4. **`ProjectStatusScreen.tsx`** - Added ResearchAnswers component and navigation links
+5. **`api.analyze-research-evidence.tsx`** - New research analysis endpoint
+6. **`route-definitions.ts`** - Added research workflow route
+7. **`OnboardingStepper.tsx`** - Enhanced with navigation support
+8. **`questions/index.tsx`** - Made stepper steps clickable
+
+### Impact
+This system provides a complete research structure management experience with:
+- **Real-time persistence** for all research planning activities
+- **Evidence traceability** from interviews back to research questions
+- **Simplified user experience** with clear navigation paths
+- **Comprehensive progress tracking** for research projects
+- **Scalable architecture** supporting complex research workflows
+
+The implementation follows established patterns in the codebase and maintains consistency with existing authentication, routing, and data management approaches.
+
+---
+
+## Clean Research Answers Component (2025 Update)
+
+### Overview
+A redesigned Decision Analysis interface that provides a clean, modern view of research progress with improved user experience and performance.
+
+### Key Learnings from Implementation
+
+#### 1. React Version Compatibility Issues
+**Problem:** Encountered `Cannot read properties of null (reading 'useContext')` error during development.
+
+**Root Cause:** The app was using React 19.1.0 which has breaking changes that aren't fully compatible with React Router 7.6.3.
+
+**Solution:** 
+- Downgraded to React 18.3.1 (stable, well-tested version)
+- Updated compatible dependencies (`@testing-library/react`, `vitest-browser-react`)
+- Removed React 19 specific features (`babel-plugin-react-compiler`)
+
+**Key Insight:** Always use stable React versions in production apps. React 19 introduced breaking changes to context handling that can cause hydration errors.
+
+#### 2. Vite Bundling and Import Conflicts
+**Problem:** `Cannot read properties of undefined (reading 'S')` bundling error causing infinite loading states.
+
+**Root Cause:** Complex import chains and circular dependencies between:
+- `RouteDefinitions` type imports
+- `Link` component from react-router
+- Multiple UI component imports in a single file
+
+**Solution:**
+- Simplified imports by removing problematic dependencies
+- Used native HTML `<details>` element instead of Radix UI Accordion
+- Temporarily removed evidence links to isolate bundling issues
+- Cleared Vite cache (`rm -rf node_modules/.vite`)
+
+**Key Insight:** When facing bundling errors, simplify imports first. Complex import chains can cause circular dependencies that break Vite's optimization.
+
+#### 3. Component Design Patterns
+**Successful Patterns:**
+- ✅ **Native HTML Elements**: Using `<details>` for collapsible content avoids React hook issues
+- ✅ **Simplified Props**: Removing complex type dependencies reduces bundling conflicts
+- ✅ **Progressive Enhancement**: Start with basic functionality, add features incrementally
+- ✅ **Error Boundaries**: Silent failures with graceful degradation for API calls
+
+**Anti-Patterns to Avoid:**
+- ❌ **Complex Import Chains**: Multiple UI library imports in single components
+- ❌ **Tight Coupling**: Components depending on complex route definition types
+- ❌ **Hook Overuse**: Using React hooks when native HTML provides the functionality
+
+#### 4. Development Workflow Insights
+**Best Practices Learned:**
+1. **Version Lock Critical Dependencies**: React, React Router, and core UI libraries should use stable versions
+2. **Incremental Development**: Build components in isolation before integrating
+3. **Bundle Analysis**: Monitor Vite output for optimization warnings
+4. **Cache Management**: Clear build caches when encountering unexplained errors
+5. **Graceful Degradation**: Always provide fallbacks for complex features
+
+### Technical Implementation
+
+#### CleanResearchAnswers Component Features
+- **Clean Design**: Modern card-based layout with proper typography hierarchy
+- **Decision Cards**: Visual indicators (✓ for answered, ? for pending) with confidence badges
+- **Collapsible Details**: Native HTML `<details>` for research question learnings
+- **Loading States**: Skeleton animations during data fetching
+- **Error Handling**: Silent failures with graceful UI degradation
+
+#### Database Integration
+- Fetches from `/api.research-answers` endpoint
+- Uses proper TypeScript interfaces for type safety
+- Implements proper loading and error states
+- Follows established authentication patterns
+
+#### Performance Optimizations
+- **Lazy Loading**: Component only renders when data is available
+- **Efficient Queries**: Single API call for all decision question data
+- **Minimal Re-renders**: Proper useEffect dependencies
+- **Bundle Optimization**: Simplified imports reduce bundle size
+
+### Files Created/Modified
+1. **`CleanResearchAnswers.tsx`** - New clean research answers component
+2. **`ProjectStatusScreen.tsx`** - Updated to use CleanResearchAnswers
+3. **`package.json`** - Downgraded React to stable version
+4. **`user-flow.md`** - This documentation update
+
+### Lessons for Future Development
+1. **Stability Over Features**: Choose stable dependencies over cutting-edge versions
+2. **Simplicity Over Complexity**: Native HTML often beats complex React components
+3. **Incremental Integration**: Build and test components in isolation first
+4. **Monitor Bundle Health**: Watch for Vite optimization warnings and errors
+5. **Document Learnings**: Capture technical decisions and their reasoning
+
+This implementation demonstrates the importance of balancing modern development practices with stability and maintainability in production applications.

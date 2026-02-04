@@ -5,7 +5,7 @@ dist
 out
 coverage
 .history
-.react-router
+.react-router/
 
 # Other Coverage tools
 *.lcov
@@ -16,8 +16,14 @@ coverage
 # Cache Directories and files
 .cache
 .yarn*
+
+# Environment files
 .env*
 !.env.example
+!.env.production
+
+# Test screenshots (usually blank error images)
+**/__screenshots__/
 !.env.production
 .swp*
 .turbo
@@ -81,3 +87,20 @@ blob-report
 *.sqlite
 *.sqlite3
 *.db-journal
+
+# Local Netlify folder
+.netlify
+
+# Mastra
+.mastra
+.trigger
+*storybook.log
+storybook-static
+
+backups
+mkcert
+# Cadre devkit (local reference only)
+cadre-devkit-claude/
+
+# bv (beads viewer) local config and caches
+.bv/

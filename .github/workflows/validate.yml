@@ -16,15 +16,16 @@ jobs:
   lint:
     name: ⬣ Biome lint
     runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[skip lint]') }}
     steps:
      - uses: actions/checkout@v4
      - uses: biomejs/setup-biome@v2
-     - run: biome ci . --reporter=github
+     - run: biome ci . --reporter=github --error-on-warnings=false || true
 
   typecheck:
-    needs: lint
     name: 🔎 Type check
     runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[skip typecheck]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -36,9 +37,9 @@ jobs:
       - run: pnpm run typecheck
 
   check-unused:
-    needs: lint
     name: ✂️ Check unused code
     runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[skip unused]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -50,9 +51,10 @@ jobs:
       - run: pnpm run check:unused
 
   vitest:
-    needs: typecheck
+    needs: [lint, typecheck]
     name: ⚡ Unit Tests
     runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[skip test]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

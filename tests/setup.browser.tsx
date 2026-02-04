@@ -1,6 +1,7 @@
 import "../app/tailwind.css"
 import { renderHook as renderReactHook } from "@testing-library/react"
 import { createInstance } from "i18next"
+import { PostHogProvider } from "posthog-js/react"
 import { I18nextProvider, initReactI18next } from "react-i18next"
 import { createRoutesStub, Outlet, type RoutesTestStubProps } from "react-router"
 import { render } from "vitest-browser-react"
@@ -35,9 +36,19 @@ const renderStub = async (args?: {
 			children: args?.entries ?? [],
 			Component: () => (
 				<div data-testid="root">
-					<I18nextProvider i18n={instance}>
-						<Outlet />
-					</I18nextProvider>
+					<PostHogProvider
+						apiKey={import.meta.env.VITE_PUBLIC_POSTHOG_KEY}
+						options={{
+							api_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST,
+							defaults: "2025-05-24",
+							capture_exceptions: true, // This enables capturing exceptions using Error Tracking, set to false if you don't want this
+							debug: import.meta.env.MODE === "development",
+						}}
+					>
+						<I18nextProvider i18n={instance}>
+							<Outlet />
+						</I18nextProvider>
+					</PostHogProvider>
 				</div>
 			),
 		},

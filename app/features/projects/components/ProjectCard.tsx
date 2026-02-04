@@ -1,0 +1,208 @@
+import { motion } from "framer-motion"
+import { Hash, MessageCircleQuestion, Pencil, Settings2 } from "lucide-react"
+import { Link } from "react-router-dom"
+import { Streamdown } from "streamdown"
+// Flattened sections view (no accordion)
+import { Avatar, AvatarFallback } from "~/components/ui/avatar"
+import { Badge } from "~/components/ui/badge"
+import { Button } from "~/components/ui/button"
+import { Separator } from "~/components/ui/separator"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "~/components/ui/tooltip"
+import { useProjectRoutes } from "~/hooks/useProjectRoutes"
+import type { Project, Project_Section } from "~/types"
+
+interface ProjectCardProps {
+	project: Project
+	sections: Project_Section[] // <- new
+	className?: string
+	projectPath: string
+}
+
+function stringToColor(str: string) {
+	let hash = 0
+	for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash)
+	const c = (hash & 0x00ffffff).toString(16).toUpperCase()
+	return `#${"00000".substring(0, 6 - c.length)}${c}`
+}
+
+function groupLatestByKind(sections: Project_Section[]) {
+	const byKind = new Map<string, Project_Section[]>()
+	for (const s of sections) {
+		const arr = byKind.get(s.kind) ?? []
+		arr.push(s)
+		byKind.set(s.kind, arr)
+	}
+	// sort newest first within kind (position asc nulls last already in loader is fine; here prefer created_at desc)
+	for (const [k, arr] of byKind) {
+		arr.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+		byKind.set(k, arr)
+	}
+	return byKind
+}
+
+function _preview(text: string, n = 140) {
+	const t = text.replace(/[*`_#>-]+/g, " ").trim()
+	return t.length > n ? `${t.slice(0, n).trim()}…` : t
+}
+
+export function ProjectCard({ project, sections, className, projectPath }: ProjectCardProps) {
+	const themeColor = stringToColor(project.slug || project.name || "P")
+	const initials = (project.slug || project.name || "P")
+		.split(" ")
+		.map((n) => n[0])
+		.join("")
+		.toUpperCase()
+		.slice(0, 2)
+	const routes = useProjectRoutes(projectPath)
+	const byKind = groupLatestByKind(sections)
+
+	// Preferred display order; fall back to any others present
+	const preferredOrder = [
+		"research_goal",
+		"questions",
+		"target_orgs",
+		"target_roles",
+		"assumptions",
+		"unknowns",
+		"custom_instructions",
+	]
+	// Build kinds, but exclude 'questions' from inline content since it has a dedicated editor
+	const kinds = [...new Set([...preferredOrder, ...Array.from(byKind.keys())])]
+		.filter((k) => byKind.has(k))
+		.filter((k) => k !== "questions")
+
+	const kindLabel: Record<string, string> = {
+		research_goal: "Research Goal",
+		questions: "Interview Questions",
+		target_orgs: "Target Organizations",
+		target_roles: "Target Roles",
+		assumptions: "Assumptions",
+		unknowns: "Unknowns",
+		custom_instructions: "Custom Instructions",
+		goal: "Goal",
+		findings: "Findings",
+		background: "Background",
+	}
+
+	const editBtn = (
+		<TooltipProvider>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<Link
+						to={routes.projects.edit(project.id)}
+						onClickCapture={(e) => e.stopPropagation()}
+						className="z-20"
+						aria-label="Edit project"
+						title="Edit project"
+					>
+						<Button variant="ghost" size="icon" className="h-8 w-8">
+							<Settings2 className="h-4 w-4" />
+						</Button>
+					</Link>
+				</TooltipTrigger>
+				<TooltipContent side="left">Edit</TooltipContent>
+			</Tooltip>
+		</TooltipProvider>
+	)
+
+	return (
+		<motion.div
+			className={`relative overflow-hidden rounded-xl border border-border bg-background shadow-md transition-all duration-300 hover:shadow-lg ${className ?? ""}`}
+			whileHover={{ y: -4, scale: 1.02 }}
+			transition={{ duration: 0.3, ease: "easeOut" }}
+		>
+			<div className="h-1 w-full" style={{ backgroundColor: themeColor }} />
+
+			<div className="flex items-start gap-4 p-6">
+				<Avatar className="h-14 w-14 shrink-0 border-2" style={{ borderColor: themeColor }}>
+					<AvatarFallback className="font-medium text-lg text-white" style={{ backgroundColor: themeColor }}>
+						{initials}
+					</AvatarFallback>
+				</Avatar>
+
+				<div className="min-w-0 flex-1">
+					<div className="flex items-start justify-between gap-3">
+						<div className="min-w-0">
+							<h3 className="mb-1 flex items-center gap-2 break-words font-bold text-xl" style={{ color: themeColor }}>
+								<Link to={projectPath} className="hover:underline" onClick={(e) => e.stopPropagation()}>
+									{project.name}
+								</Link>
+								{project.status && (
+									<Badge variant="secondary" className="h-5 px-1.5 text-[10px] leading-none">
+										{project.status}
+									</Badge>
+								)}
+							</h3>
+							{project.slug && (
+								<div className="flex items-center gap-1 text-muted-foreground text-xs">
+									<Hash className="h-3.5 w-3.5" />
+									{project.slug}
+								</div>
+							)}
+						</div>
+						<div className="relative z-20">{editBtn}</div>
+					</div>
+
+					{project.description && (
+						<div className="mt-2 line-clamp-3 text-sm leading-relaxed">{project.description}</div>
+					)}
+				</div>
+			</div>
+
+			<Separator />
+
+			<div className="p-6">
+				<div className="mb-3 flex items-center justify-between">
+					<div className="font-semibold text-muted-foreground text-sm">Project Sections</div>
+					<Link to={routes.questions.index()} onClick={(e) => e.stopPropagation()} aria-label="Manage Questions">
+						<Button size="sm" variant="outline" className="h-7 gap-1.5 px-2 text-xs">
+							<MessageCircleQuestion className="h-3.5 w-3.5" />
+							Manage Questions
+						</Button>
+					</Link>
+				</div>
+				<div className="space-y-4">
+					{kinds.map((k) => {
+						const arr = byKind.get(k)!
+						const latest = arr[0]
+						return (
+							<div key={k} className="rounded-md border p-4">
+								<div className="mb-2 flex items-center justify-between gap-2">
+									<div className="flex items-center gap-2">
+										<div className="h-4 w-1.5 rounded-full" style={{ backgroundColor: themeColor }} />
+										<div className="font-semibold text-sm tracking-wide">{kindLabel[k] || k}</div>
+									</div>
+									{k === "research_goal" && (
+										<Link
+											to={routes.projects.setup()}
+											onClick={(e) => e.stopPropagation()}
+											aria-label="Edit Goals"
+											title="Edit Goals"
+										>
+											<Button size="sm" variant="outline" className="h-7 gap-1.5 px-2 text-xs">
+												<Pencil className="h-3.5 w-3.5" />
+												Edit Goals
+											</Button>
+										</Link>
+									)}
+								</div>
+								<div className="prose prose-sm dark:prose-invert max-w-none">
+									<Streamdown>{latest.content_md ?? ""}</Streamdown>
+								</div>
+								{arr.length > 1 && (
+									<div className="mt-3 space-y-3">
+										{arr.slice(1, 5).map((s) => (
+											<div key={s.id} className="prose prose-sm dark:prose-invert max-w-none border-t pt-3">
+												<Streamdown>{s.content_md ?? ""}</Streamdown>
+											</div>
+										))}
+									</div>
+								)}
+							</div>
+						)
+					})}
+				</div>
+			</div>
+		</motion.div>
+	)
+}

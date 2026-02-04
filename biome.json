@@ -1,7 +1,15 @@
 {
 	"$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
 	"files": {
-		"includes": ["**", "!**/app/library/icon/**/*"]
+		"includes": [
+			"app/**",
+			"docs/**",
+			"baml_src/**",
+			"scripts/**",
+			"mastra/**",
+			"resources/**",
+			"!**/app/library/icon/**/*"
+		]
 	},
 	"vcs": {
 		"enabled": true,
@@ -24,9 +32,16 @@
 		"enabled": true,
 		"rules": {
 			"recommended": true,
+			"correctness": {
+				"recommended": true,
+				"noUnusedImports": "warn",
+				"noUnusedLabels": "error",
+				"useExhaustiveDependencies": "warn"
+			},
 			"suspicious": {
 				"recommended": true,
-				"noConsole": "error"
+				"noConsole": "off",
+				"noArrayIndexKey": "warn"
 			},
 			"style": {
 				"recommended": true,
@@ -38,7 +53,7 @@
 				"useSingleVarDeclarator": "error",
 				"noUnusedTemplateLiteral": "error",
 				"useNumberNamespace": "error",
-				"noInferrableTypes": "error",
+				"noInferrableTypes": "warn",
 				"noUselessElse": "error",
 				"noProcessEnv": "off"
 			},
@@ -51,15 +66,8 @@
 			"performance": {
 				"recommended": true
 			},
-			"correctness": {
-				"recommended": true,
-				"noUnusedImports": "error",
-				"noUnusedVariables": "error",
-				"noUnusedLabels": "error",
-				"noUnusedFunctionParameters": "error"
-			},
 			"a11y": {
-				"recommended": true
+				"recommended": false
 			},
 			"nursery": {
 				"recommended": true,

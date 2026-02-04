@@ -1,0 +1,40 @@
+import type { ActionFunctionArgs } from "react-router"
+import { deleteInterview } from "~/features/interviews/db"
+import { getServerClient } from "~/lib/supabase/client.server"
+
+export async function action({ request }: ActionFunctionArgs) {
+	const { client: supabase } = getServerClient(request)
+
+	const formData = await request.formData()
+	const interviewId = formData.get("interviewId") as string
+	const projectId = formData.get("projectId") as string
+
+	if (!interviewId || !projectId) {
+		return Response.json({ error: "Interview ID and Project ID are required" }, { status: 400 })
+	}
+
+	// Get the project to verify access and get account_id
+	const { data: project } = await supabase.from("projects").select("account_id").eq("id", projectId).single()
+
+	if (!project) {
+		return Response.json({ error: "Project not found" }, { status: 404 })
+	}
+
+	const { error } = await deleteInterview({
+		supabase,
+		id: interviewId,
+		accountId: project.account_id,
+		projectId,
+	})
+
+	if (error) {
+		console.error("Error deleting interview:", error)
+		return Response.json({ error: "Failed to delete interview" }, { status: 500 })
+	}
+
+	// Return success with redirect URL for client to handle
+	return Response.json({
+		success: true,
+		redirectTo: `/a/${project.account_id}/${projectId}/interviews`,
+	})
+}

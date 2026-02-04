@@ -1,0 +1,416 @@
+# Interview Processing Flows
+
+This document describes the two main flows for processing interviews in the Insights application: Upload Recording and Realtime Recording.
+
+## Overview
+
+Both flows follow the same analysis pipeline after transcription to ensure consistent processing and insight extraction:
+
+1. **Audio Upload**: File → Cloudflare R2 (multipart for large files) → R2 Key Storage
+2. **Transcription**: AssemblyAI downloads from R2 via presigned URL → Text transcript
+3. **Analysis Orchestration**: Trigger.dev task pipeline
+4. **Two-Pass AI Processing**: 
+   - Pass 1: Extract evidence units and insights via BAML/OpenAI
+   - Pass 2: Enrich insights with persona facets
+5. **Database Storage**: Store insights, link participants, create personas with facets
+
+## Media URL Architecture
+
+### Storage Strategy
+
+**✅ Implemented:** Store R2 keys in database, generate presigned URLs on-demand.
+
+### Data Format
+
+**Database Storage (R2 Key - never expires):**
+```
+interviews/785c124a-d1e2-4538-8908-df39b0973f5b/2241b1d3-6e0f-4c7b-8a75-aed9291cf60c-1761518365678.mp4
+```
+
+**Runtime Use (Presigned URL - temporary access):**
+```
+https://1bde90f07a6fb51a2c287bf052f90e76.r2.cloudflarestorage.com/upsight-usermedia/interviews/...?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=...&X-Amz-Expires=86400...
+```
+
+### Usage Patterns
+
+1. **Upload Flow** (`storeAudioFile`):
+   - Returns `mediaUrl` (R2 key) for database storage
+   - Returns `presignedUrl` for immediate transcription use
+
+2. **Database Storage**:
+   - Store only the R2 key in `interview.media_url`
+   - Never store presigned URLs (they expire after 24 hours)
+
+3. **Immediate Use** (Transcription):
+   - Use presigned URL directly (valid 24 hours)
+   - AssemblyAI downloads file during this window
+
+4. **On-Demand Access** (Playback, Evidence Cards):
+   - Generate fresh presigned URL from R2 key
+   - Different expiration times for different use cases:
+     - Transcription: 24 hours (long-running)
+     - Playback: 1 hour (user session)
+     - Download: 5 minutes (immediate)
+
+### Code Paths Using media_url
+
+**Upload & Storage:**
+- `app/routes/api.onboarding-start.tsx` - Stores R2 key, passes presigned URL to transcription
+- `app/routes/api.upload-file.tsx` - Stores R2 key, uses presigned URL for transcription
+- `app/routes/api.upload-from-url.tsx` - Stores R2 key, uses presigned URL for transcription
+- `app/routes/api.interviews.realtime-finalize.tsx` - Updates media URL
+
+**Transcription & Processing:**
+- `src/trigger/interview/uploadMediaAndTranscribe.ts` - Generates/uses presigned URLs for transcription
+- `app/utils/processInterviewAnalysis.server.ts` - Passes media URL to Trigger.dev
+- `app/utils/regenerateEvidence.server.ts` - Generates fresh presigned URL for retry
+- `app/routes/api.analysis-retry.tsx` - Generates fresh presigned URL for retry
+
+**Display & Playback:**
+- `app/features/interviews/pages/detail.tsx` - Generates fresh presigned URL on-demand
+- `app/features/interviews/pages/edit.tsx` - Shows media player with fresh URL
+- `app/features/evidence/components/EvidenceCard.tsx` - Uses `fallbackMediaUrl` with fresh URL
+- `app/utils/media-url.client.ts` - Generates fresh URLs from R2 keys via API
+
+**Database Queries:**
+- `app/features/interviews/db.ts` - Selects media_url field (R2 key)
+- `app/utils/processInterview.server.ts` - Uses `getR2KeyFromPublicUrl()` for evidence anchors
+
+## 1. Upload Recording Flow
+
+### Entry Points
+- **URL Upload**: `api.upload-from-url` route
+- **File Upload**: Onboarding flow via UploadScreen component (triggers webhook flow)
+
+### Flow A: URL Upload (`api.upload-from-url` / Mastra Tool)
+
+**Files involved:**
+- `app/routes/api.upload-from-url.tsx` - API endpoint
+- `app/mastra/tools/import-video-from-url.ts` - Chat agent tool
+- `src/trigger/interview/importFromUrl.ts` - Trigger.dev task (single source of truth)
+- `app/utils/extractMediaUrl.server.ts` - Media URL extraction
+
+**Supported URL Types:**
+- Direct media files (mp4, mp3, m4a, webm, mov, etc.)
+- HLS streaming manifests (.m3u8) - converted to MP4 via ffmpeg
+- DASH streaming manifests (.mpd) - converted to MP4 via ffmpeg
+- Webpages containing embedded video (Vento.so, Apollo.io, etc.)
+
+**Process:**
+```
+1. POST /api.upload-from-url OR Chat agent importVideoFromUrl tool
+   ├── Both delegate to Trigger.dev importFromUrl task
+   └── Returns Trigger.dev run ID + public access token
+
+2. Trigger.dev importFromUrl task:
+   ├── Step 1: Resolve URL → media URL
+   │   ├── Direct media URLs: Use as-is
+   │   ├── HLS/DASH streams: Use as-is (will be converted)
+   │   └── Webpages: Extract media URL via extractAllMediaUrls()
+   │       ├── Scans HTML for og:video, video tags, JSON-LD
+   │       ├── Searches for HLS/DASH manifest URLs
+   │       └── Falls back to LLM extraction if regex fails
+   │
+   ├── Step 2: Download media
+   │   ├── Streaming (HLS/DASH): ffmpeg converts to MP4
+   │   └── Progressive (mp4, mp3): Direct fetch + stream to R2
+   │
+   ├── Step 3: Upload to Cloudflare R2
+   │   └── Stores at: interviews/{projectId}/{interviewId}-{timestamp}.{ext}
+   │
+   ├── Step 4: Create interview record
+   │   └── Stores R2 key in media_url field
+   │
+   ├── Step 5: Trigger thumbnail generation (video files only)
+   │   └── generate-thumbnail task extracts frame at 1 second
+   │
+   └── Step 6: Trigger transcription & analysis workflow
+       └── createAndProcessAnalysisJob() → processInterviewTask
+```
+
+**Key Data Flow:**
+- Media downloaded/converted and stored in R2
+- Interview record created with R2 key
+- Thumbnail generated asynchronously (video files only)
+- Transcription + analysis via AssemblyAI webhook flow
+
+### Flow B: File Upload via Webhook (`api.assemblyai-webhook`)
+
+**Files involved:**
+- Onboarding: `app/features/onboarding/components/UploadScreen.tsx`
+- Webhook: `app/routes/api.assemblyai-webhook.tsx`
+- Analysis: `app/utils/processInterviewAnalysis.server.ts`
+- Processing: `app/utils/processInterview.server.ts`
+
+Note the Webhook requirement: AssemblyAI processes async, so we need to wait for the webhook to complete before processing the transcript. In production, supabase hosts the webhok, but in dev we need to run ngrok to open a port:
+
+```bash
+ngrok http --url=cowbird-still-routinely.ngrok-free.app 4280
+```
+
+
+**Process:**
+```
+1. User uploads file via UploadScreen (or api.onboarding-start)
+   ├── File uploaded to Cloudflare R2 using multipart upload:
+   │   ├── Files > 100MB: Multipart (10MB chunks, 2 parallel, 3 retries, 60s timeout)
+   │   ├── Files < 100MB: Single upload
+   │   └── Stored at: interviews/{projectId}/{interviewId}-{timestamp}.{ext}
+   ├── Generate presigned URL (valid 24 hours) for immediate use:
+   │   ├── Uses AWS Signature V4 with R2 credentials
+   │   ├── Includes X-Amz-Algorithm, X-Amz-Credential, X-Amz-Signature in query params
+   │   └── Allows AssemblyAI to download from private R2 bucket
+   ├── Store R2 key in database (NOT presigned URL):
+   │   ├── media_url = "interviews/{projectId}/{interviewId}-{timestamp}.{ext}"
+   │   └── R2 keys never expire, presigned URLs do
+   └── Pass presigned URL to transcription (immediate use)
+
+2. AssemblyAI transcription submission
+   ├── Creates upload_jobs record with assemblyai_id
+   ├── POST to AssemblyAI /v2/transcript with:
+   │   ├── audio_url: presigned R2 URL (NOT uploaded to AssemblyAI)
+   │   ├── webhook_url: /api/assemblyai-webhook
+   │   ├── speaker_labels: true
+   │   ├── iab_categories: true
+   │   ├── format_text: true
+   │   ├── punctuate: true
+   │   ├── auto_highlights: true
+   │   ├── summarization: true
+   │   └── summary_model: "informative"
+   └── AssemblyAI downloads from R2 and processes async
+
+3. POST /api/assemblyai-webhook (when transcription completes)
+   ├── Finds upload_jobs record by assemblyai_id
+   ├── Fetches full transcript data from AssemblyAI API
+   ├── Updates interview record:
+   │   ├── status: "transcribed"
+   │   ├── transcript: transcriptData.text
+   │   ├── transcript_formatted: formattedTranscriptData
+   │   └── duration_sec: transcriptData.audio_duration (rounded)
+   ├── Triggers Trigger.dev task pipeline:
+   │   └── processInterviewTask.trigger({ interviewId, accountId, projectId })
+   └── Handles errors by marking jobs/interviews as "error"
+```
+
+## 2. Realtime Recording Flow
+
+**Files involved:**
+- Entry: `app/features/interviews/pages/realtime.tsx`
+- Component: `app/features/realtime/components/InterviewCopilot.tsx`
+- Finalize: `app/routes/api.interviews.realtime-finalize.tsx`
+- Analysis: `app/utils/processInterviewAnalysis.server.ts`
+- Processing: `app/utils/processInterview.server.ts`
+
+**Process:**
+```
+1. GET /a/{accountId}/{projectId}/interviews/{interviewId}/realtime
+   └── Loads InterviewCopilot component
+
+2. InterviewCopilot Component Operations:
+   ├── Establishes WebSocket connection to /ws/realtime-transcribe
+   ├── Captures audio via AudioWorklet (PCM processing)
+   ├── Streams 16kHz PCM audio chunks to WebSocket
+   ├── Receives real-time transcript updates
+   ├── Records audio locally via MediaRecorder (WebM/Opus)
+   └── Shows live transcript + interview tools
+
+3. User clicks "Finish" → stopStreaming()
+   ├── Stops WebSocket connection
+   ├── Stops MediaRecorder and creates audio blob
+   ├── Uploads audio blob to Cloudflare R2
+   ├── Calls POST /api/interviews/realtime-finalize
+   │   ├── Updates interview with transcript + media_url
+   │   ├── Creates formattedTranscriptData:
+   │   │   ├── full_transcript: transcript
+   │   │   ├── confidence: 0.8 (default)
+   │   │   ├── audio_duration: null (not available)
+   │   │   ├── file_type: "realtime"
+   │   │   └── original_filename: "realtime-{interviewId}"
+   │   ├── Calls createAndProcessAnalysisJob()
+   │   │   ├── Creates analysis_jobs record
+   │   │   ├── Updates interview status: "processing"
+   │   │   ├── Calls processInterviewTranscriptWithAdminClient()
+   │   │   ├── Extracts evidence via BAML
+   │   │   ├── Generates insights via BAML + GPT-4o
+   │   │   ├── Creates people/personas/tags
+   │   │   ├── Updates analysis_jobs status: "done"
+   │   │   └── Updates interview status: "ready"
+   │   └── Handles errors gracefully
+   └── Navigates to interview detail page
+```
+
+## Shared Analysis Pipeline (Trigger.dev)
+
+Both flows converge at the Trigger.dev task pipeline which orchestrates async processing:
+
+**Files:**
+- `app/trigger/tasks/process-interview.ts` - Main orchestration task
+- `app/trigger/tasks/enrich-insights-with-facets.ts` - Persona facet enrichment
+- `app/utils/processInterview.server.ts` - Core AI processing
+
+**Architecture:**
+```
+Trigger.dev Task Pipeline (v4 SDK)
+├── processInterviewTask (main orchestrator)
+│   ├── Pass 1: Extract & Analyze
+│   │   ├── Extract evidence units via BAML ExtractEvidenceFromTranscript
+│   │   ├── Auto-generate themes from evidence
+│   │   ├── Extract insights via BAML ExtractInsights + GPT-4o
+│   │   ├── Create person record from interviewee data
+│   │   ├── Assign persona via BAML AssignPersonaToInterview
+│   │   ├── Create tags from insights.relatedTags
+│   │   └── Link insights to personas via junction tables
+│   ├── Pass 2: Enrich with Persona Facets
+│   │   └── enrichInsightsWithFacetsTask.triggerAndWait()
+│   │       ├── Fetches all insights for interview
+│   │       ├── Fetches persona facets for assigned persona
+│   │       ├── For each insight:
+│   │       │   ├── Analyzes relevance to each facet
+│   │       │   ├── Generates facet-specific analysis
+│   │       │   └── Links insight to relevant facets via insight_persona_facets
+│   │       └── Returns enrichment statistics
+│   └── Updates interview status: "ready"
+└── Error handling with proper status updates
+```
+
+**Trigger.dev Features Used:**
+- **Task Orchestration**: `task()` for defining long-running background jobs
+- **Task Chaining**: `triggerAndWait()` for sequential task execution
+- **Retry Logic**: Automatic retries with exponential backoff
+- **Progress Tracking**: Real-time status updates via Trigger.dev dashboard
+- **No Timeouts**: Tasks can run indefinitely (unlike serverless functions)
+
+**Persona Facets:**
+Each persona has multiple facets (e.g., "Goals & Motivations", "Pain Points", "Decision Criteria") that provide structured dimensions for analysis. The enrichment task:
+1. Analyzes each insight against all persona facets
+2. Determines relevance and generates facet-specific insights
+3. Creates `insight_persona_facets` junction records for traceability
+4. Enables facet-based filtering and analysis in the UI
+
+## Key Differences
+
+| Aspect | Upload Flow | Realtime Flow |
+|--------|-------------|---------------|
+| **Audio Source** | External file/URL | Live recording |
+| **Transcription** | AssemblyAI (full features) | WebSocket streaming |
+| **Audio Duration** | ✅ From AssemblyAI | ✅ From audio blob |
+| **Audio Storage** | ✅ Stored in Cloudflare R2 | ✅ Stored in Cloudflare R2 |
+| **Processing Timing** | After upload completes | After recording finishes |
+| **Error Handling** | Webhook resilience | UI error states |
+
+## Audio Duration Handling
+
+**Upload Flow**:
+- ✅ `duration_sec` stored directly from AssemblyAI `audio_duration` field
+- AssemblyAI provides accurate duration after transcription completes
+
+**Realtime Flow**:
+- ✅ `duration_sec` extracted from recorded audio blob using HTML5 Audio API
+- `getAudioDuration()` function loads the blob and reads `audio.duration`
+- Duration sent to `realtime-finalize` endpoint and stored in database
+
+**Resolution**: Both flows now properly store audio duration in the `duration_sec` field.
+
+**Database Storage**:
+Both flows store duration in `interviews.duration_sec` field (integer seconds).
+
+## Audio File Storage
+
+**NEW**: All interview flows now store the original audio files in Cloudflare R2 for consistent media access.
+
+### Storage Implementation
+
+**Shared Utility**: `storeAudioFile.server.ts`
+- Handles File, Blob, and URL sources
+- Stores files in R2 bucket with multipart upload for large files:
+  - **Multipart Upload** (files > 100MB):
+    - 10MB chunks uploaded in parallel (max 2 concurrent)
+    - 3 retry attempts per chunk with exponential backoff
+    - 60-second timeout per chunk
+    - Reduced concurrency for network stability
+  - **Single Upload** (files < 100MB):
+    - Direct upload with retry logic
+- Generates consistent filenames: `interviews/{projectId}/{interviewId}-{timestamp}.{ext}`
+- **Returns presigned URLs** (not public URLs):
+  - Valid for 24 hours
+  - Uses AWS Signature V4 with R2 credentials
+  - Allows temporary access to private bucket
+  - Required for AssemblyAI to download files
+
+### Upload Flows Storage:
+
+**api.onboarding-start.tsx** (main upload flow):
+1. ✅ Stores original file in Cloudflare R2 (multipart if > 100MB)
+2. ✅ Generates presigned URL (24-hour expiry)
+3. ✅ Submits presigned URL to AssemblyAI /v2/transcript (AssemblyAI downloads from R2)
+4. ✅ Stores presigned URL as `media_url` in database
+5. ✅ Creates upload_jobs record for webhook tracking
+
+**api.upload-file.tsx**:
+1. ✅ Stores original file in Cloudflare R2 (multipart if > 100MB)
+2. ✅ Generates presigned URL (24-hour expiry)
+3. ✅ Submits presigned URL to AssemblyAI (NOT uploaded to AssemblyAI)
+4. ✅ Uses presigned URL as `media_url` in database
+
+**api.upload-from-url.tsx** (delegates to Trigger.dev):
+1. ✅ Triggers Trigger.dev `importFromUrl` task
+2. ✅ Task handles media extraction (direct, HLS/DASH, webpage)
+3. ✅ Task downloads/converts and stores in Cloudflare R2
+4. ✅ Task generates thumbnail for video files
+5. ✅ Task triggers transcription + analysis workflow
+
+**Realtime Flow**:
+1. ✅ Records audio locally via MediaRecorder
+2. Stores recorded blob in Cloudflare R2
+3. Uses stored URL as `media_url` in database
+
+### Benefits:
+- **No Duplicate Uploads**: File uploaded once to R2, AssemblyAI downloads from there (50% faster)
+- **Large File Support**: Multipart upload handles files up to 2.2GB reliably
+- **Network Resilience**: Retry logic and reduced concurrency prevent timeout errors
+- **Secure**: Presigned URLs provide temporary access without making bucket public
+- **Data Ownership**: Audio files stored in our infrastructure
+- **Cost Efficient**: No bandwidth costs for uploading to AssemblyAI
+- **Performance**: Files served from Cloudflare R2 CDN
+
+## Data Flow Summary
+
+```
+File Upload Flow:
+File → R2 Multipart Upload → Presigned URL → AssemblyAI Download → Webhook → Trigger.dev
+  ↓         ↓                      ↓                ↓                  ↓           ↓
+Browser  10MB chunks         AWS Sig V4      Transcription      Status Update  Task Pipeline
+         (2 parallel)      (24hr expiry)   + audio_duration                      ↓
+                                                                          Pass 1: Extract
+                                                                          ├── Evidence
+                                                                          ├── Insights
+                                                                          ├── People
+                                                                          └── Personas
+                                                                                  ↓
+                                                                          Pass 2: Enrich
+                                                                          └── Persona Facets
+                                                                                  ↓
+                                                                            Database
+
+URL Import Flow (api.upload-from-url / Chat Agent):
+URL → Trigger.dev importFromUrl → Extract Media → Download/Convert → R2 Upload
+  ↓         ↓                          ↓                ↓                ↓
+Input   Background Task        Webpage/HLS/Direct    ffmpeg (streams)  R2 Key
+                                   ↓                   ↓                 ↓
+                               Media URL          MP4 (if HLS/DASH)   Interview Record
+                                                                          ↓
+                                                                    Thumbnail (video)
+                                                                          ↓
+                                                                    Transcription
+                                                                          ↓
+                                                                    Analysis Pipeline
+
+Realtime Flow:
+Live Audio → WebSocket → Record+Store → Finalize → Trigger.dev → Database
+    ↓            ↓            ↓            ↓             ↓            ↓
+ Microphone  Streaming    R2 Upload   Update Status  Task Pipeline  Insights
+            Transcription  + Presigned  + Transcript                + Facets
+                           URL                                       + Evidence
+```
+

@@ -4,10 +4,11 @@
 	"editor.renderWhitespace": "all",
 	"editor.rulers": [120, 160],
 	"editor.codeActionsOnSave": {
-		"source.fixAll": "always",
-		"source.organizeImports": "never",
-		"source.organizeImports.biome": "always",
-		"quickfix.biome": "always"
+		"source.fixAll": "never",
+		"source.fixAll.biome": "explicit",
+		"source.organizeImports": "on",
+		"source.organizeImports.biome": "explicit",
+		"quickfix.biome": "on"
 	},
 	"eslint.enable": false,
 	"prettier.enable": false,
@@ -41,6 +42,22 @@
 		"Dockerfile": "*.dockerfile, .devcontainer.*, .dockerignore, captain-definition, compose.*, docker-compose.*, dockerfile*"
 	},
 	"[typescriptreact]": {
-		"editor.defaultFormatter": "biomejs.biome"
+		"editor.defaultFormatter": "vscode.typescript-language-features"
+	},
+	"deno.enable": false,
+	"scm.countBadge": "all",
+	"[typescript]": {
+		"editor.defaultFormatter": "vscode.typescript-language-features"
+	},
+	"[baml]": {
+		"editor.defaultFormatter": "Boundary.baml-extension"
+	},
+	"baml.enableCodeLens": true,
+	"baml.enableInlayHints": true,
+	"baml.trace.server": "verbose",
+	"baml.playground.autoStart": true,
+	"editor.codeLens": true,
+	"files.associations": {
+		"*.baml": "baml"
 	}
 }

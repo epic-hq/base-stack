@@ -19,6 +19,12 @@ export default async function handleRequest(
 	context: EntryContext,
 	appContext: AppLoadContext
 ) {
+	// Handle /.well-known/* requests with a 404 response to match dev server behavior
+	const url = new URL(request.url)
+	if (url.pathname.startsWith("/.well-known/")) {
+		return new Response("Not found", { status: 404 })
+	}
+
 	const callbackName = isbot(request.headers.get("user-agent")) ? "onAllReady" : "onShellReady"
 	const instance = createInstance()
 	const lng = appContext.lang
@@ -47,8 +53,7 @@ export default async function handleRequest(
 					responseHeaders.set("Content-Type", "text/html")
 
 					resolve(
-						// @ts-expect-error - We purposely do not define the body as existent so it's not used inside loaders as it's injected there as well
-						appContext.body(stream, {
+						new Response(stream, {
 							headers: responseHeaders,
 							status: didError ? 500 : responseStatusCode,
 						})
@@ -61,7 +66,6 @@ export default async function handleRequest(
 				},
 				onError(error: unknown) {
 					didError = true
-					// biome-ignore lint/suspicious/noConsole: We console log the error
 					console.error(error)
 				},
 			}

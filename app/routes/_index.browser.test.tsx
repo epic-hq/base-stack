@@ -1,43 +1,18 @@
-import * as Module from "./_index"
+import Page from "./dashboard"
 
-describe("Home route", () => {
-	it("should render the home page text properly in english", async ({ renderStub }) => {
+describe("Dashboard route", () => {
+	it("renders the dashboard layout", async ({ renderStub }) => {
 		const { getByText } = await renderStub({
 			entries: [
 				{
-					id: "home",
-					path: "/",
-					Component: () => Module.default(),
+					id: "dashboard",
+					path: "/dashboard",
+					Component: Page,
 				},
 			],
 		})
 
-		expect(
-			getByText("React Router is awesome!", {
-				exact: false,
-			})
-		).not.toBeNull()
-	})
-
-	it("should render the home page text properly with explicit language set", async ({ renderStub }) => {
-		const { getByText } = await renderStub({
-			entries: [
-				{
-					id: "home",
-					path: "/",
-
-					Component: () => Module.default(),
-				},
-			],
-			i18n: {
-				lng: "en",
-			},
-		})
-
-		expect(
-			getByText("Rick & Jett Starter Kit", {
-				exact: false,
-			})
-		).not.toBeNull()
+		expect(getByText("Building Your Application")).not.toBeNull()
+		expect(getByText("Data Fetching")).not.toBeNull()
 	})
 })

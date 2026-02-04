@@ -1,0 +1,735 @@
+// app/components/InsightCardV2.tsx
+
+import consola from "consola"
+import {
+	AlertTriangle,
+	Check,
+	CheckSquare,
+	Lightbulb,
+	Pencil,
+	QuoteIcon,
+	Send,
+	Sparkles,
+	TrendingUp,
+} from "lucide-react"
+import React, { useState } from "react"
+import { useFetcher, useParams } from "react-router"
+
+import EditableTextarea from "~/components/EditableTextarea"
+import { EntityInteractionPanel } from "~/components/EntityInteractionPanel"
+import { Badge } from "~/components/ui/badge"
+import { Button } from "~/components/ui/button"
+import { Card, CardContent, CardFooter, CardHeader } from "~/components/ui/card"
+import InlineEdit from "~/components/ui/inline-edit"
+import { Input } from "~/components/ui/input"
+import { Separator } from "~/components/ui/separator"
+import type { CommentView, Insight, InsightView } from "~/types"
+
+interface Comment {
+	id: string
+	author: string
+	text: string
+	timestamp: string
+}
+
+interface InsightCardV2Props {
+	insight: Insight
+	onTagClick?: (tag: string) => void
+	onConvertToOpportunity?: () => void
+	onArchive?: () => void
+	onDontShowMe?: () => void
+}
+
+// Helper function to validate insight ID
+const validateInsightId = (id: string | undefined): string | null => {
+	if (!id || id.trim() === "") {
+		consola.error("Invalid insight ID:", id)
+		return null
+	}
+	return id.trim()
+}
+
+const getCategoryColor = (category: string) => {
+	const colors = {
+		Onboarding: "bg-blue-100 text-blue-800 border-blue-200",
+		"Mobile Experience": "bg-green-100 text-green-800 border-green-200",
+		Dashboard: "bg-purple-100 text-purple-800 border-purple-200",
+	}
+	return colors[category as keyof typeof colors] || "bg-muted text-foreground border-border"
+}
+
+const getJourneyStageColor = (stage: string) => {
+	const colors = {
+		Activation: "bg-orange-100 text-orange-800 border-orange-200",
+		Usage: "bg-teal-100 text-teal-800 border-teal-200",
+		Optimization: "bg-indigo-100 text-indigo-800 border-indigo-200",
+	}
+	return colors[stage as keyof typeof colors] || "bg-muted text-foreground border-border"
+}
+
+// Error boundary component (currently unused but kept for future use)
+class InsightCardErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
+	constructor(props: { children: React.ReactNode }) {
+		super(props)
+		this.state = { error: null }
+	}
+	static getDerivedStateFromError(error: Error) {
+		return { error }
+	}
+	componentDidCatch(_error: Error) {}
+	render() {
+		if (this.state.error) {
+			return <div style={{ color: "red" }}>An error occurred in InsightCardV2: {String(this.state.error)}</div>
+		}
+		return this.props.children
+	}
+}
+
+export default function InsightCardV2({
+	insight,
+	onConvertToOpportunity = () => {},
+	onArchive = () => {},
+	onDontShowMe = () => {},
+	onTagClick = () => {},
+}: InsightCardV2Props) {
+	consola.trace("InsightCardV2")
+	const params = useParams()
+	const projectId = params.projectId
+	const commentFetcher = useFetcher()
+	const archiveFetcher = useFetcher()
+
+	const [editingValue, setEditingValue] = useState<string>("")
+	const [editingField, setEditingField] = useState<string | null>(null)
+
+	// Helper to handle save
+	const [savingField, setSavingField] = useState<string | null>(null)
+
+	const handleSaveField = async (field: string, value?: string) => {
+		if (savingField === field) return // Prevent double-save
+		setSavingField(field)
+		try {
+			const newValue = typeof value === "string" ? value : editingValue
+			if ((localInsight as Record<string, unknown>)[field] !== newValue) {
+				// Optimistically update local state
+				setLocalInsight((prev) => ({ ...prev, [field]: newValue }))
+				// Persist change to DB
+				await fetch("/insights/api/update-field", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						table: "insights",
+						id: localInsight.id,
+						field,
+						value: newValue,
+					}),
+				})
+			}
+		} finally {
+			setEditingField(null)
+			setSavingField(null)
+		}
+	}
+
+	// Helper to handle edit start
+	const handleEditStart = (field: string) => {
+		setEditingField(field)
+		setEditingValue(((localInsight as Record<string, unknown>)[field] as string) || "")
+	}
+
+	// Handler for inline text submit
+	const _handleTextSubmit = (newText: string) => {
+		handleSaveField(editingField!, newText)
+	}
+
+	// Reusable EditableField component
+	const EditableField = ({
+		field,
+		className,
+		placeholder,
+		multiline = false,
+	}: {
+		field: string
+		className?: string
+		placeholder?: string
+		multiline?: boolean
+	}) => {
+		const isEditing = editingField === field
+		const isSaving = savingField === field
+		const value = ((localInsight as Record<string, unknown>)[field] as string) || ""
+
+		return (
+			<div
+				className="group relative flex min-h-[1.5rem] items-start"
+				onMouseLeave={() => isEditing && handleSaveField(field)}
+			>
+				{isEditing ? (
+					<>
+						<div key="insight-field">
+							{multiline ? (
+								<textarea
+									key="insight-field"
+									defaultValue={editingValue}
+									// value={editingValue}
+									autoFocus
+									rows={3}
+									dir="ltr"
+									onChange={(e) => setEditingValue(e.target.value)}
+									onBlur={() => handleSaveField(field)}
+									className={`w-full resize-none border-blue-200 border-b bg-background pr-8 focus:outline-none ${className || ""}`}
+									placeholder={placeholder}
+								/>
+							) : (
+								<input
+									type="text"
+									// value={editingValue}
+									defaultValue={editingValue}
+									autoFocus
+									dir="ltr"
+									onChange={(e) => setEditingValue(e.target.value)}
+									onBlur={() => handleSaveField(field)}
+									className={`w-full border-blue-200 border-b bg-background pr-8 focus:outline-none ${className || ""}`}
+									placeholder={placeholder}
+								/>
+							)}
+						</div>
+						<button
+							type="button"
+							className="absolute top-1 right-0 z-10 p-1 opacity-100 transition-opacity"
+							onMouseDown={(e) => {
+								e.preventDefault()
+								handleSaveField(field)
+							}}
+							aria-label={`Save ${field}`}
+						>
+							{isSaving ? (
+								<CheckSquare className="h-4 w-4 animate-spin text-foreground/40" />
+							) : (
+								<Check className="h-4 w-4 text-green-500 hover:text-green-700" />
+							)}
+						</button>
+					</>
+				) : (
+					<>
+						<div className={`w-full pr-8 ${className || ""}`}>
+							{value || <span className="text-foreground/40">{placeholder || "(No value)"}</span>}
+						</div>
+						<button
+							type="button"
+							className="absolute top-1 right-0 z-10 p-1 opacity-0 transition-opacity group-hover:opacity-100"
+							onClick={() => handleEditStart(field)}
+							aria-label={`Edit ${field}`}
+						>
+							<Pencil className="h-4 w-4 text-foreground/40 hover:text-foreground/70" />
+						</button>
+					</>
+				)}
+			</div>
+		)
+	}
+
+	// TODO get away from defining local views unless necessary
+	// Extended insight state with UI-only fields
+	const [localInsight, setLocalInsight] = useState<InsightView>({
+		...insight,
+		comments: insight.comments || [],
+	})
+	const [_showMore, _setShowMoree] = useState(false)
+
+	// State for managing comments
+	const [showComments, setShowComments] = useState<{ [key: string]: boolean }>({})
+	const [newComments, setNewComments] = useState<{ [key: string]: string }>({})
+
+	const handleAddComment = async () => {
+		const insightId = validateInsightId(localInsight?.id)
+		if (!insightId || !projectId) {
+			consola.error("Cannot add comment: missing insight ID or project ID", {
+				insightId,
+				projectId,
+			})
+			return
+		}
+
+		const commentText = newComments[insightId]?.trim()
+		if (!commentText) return
+
+		// Optimistically add comment to local state (matching CommentView structure)
+		const newComment: CommentView = {
+			id: Date.now().toString(),
+			account_id: "", // Will be filled by server
+			content: commentText,
+			created_at: new Date().toISOString(),
+			insight_id: insightId,
+			updated_at: new Date().toISOString(),
+			user_id: "", // Will be filled by server
+			// UI-friendly fields
+			author: "You",
+			timestamp: new Date().toISOString(),
+			text: commentText,
+		}
+
+		setLocalInsight((prev) => ({
+			...prev,
+			comments: [...(prev.comments || []), newComment],
+		}))
+
+		setNewComments((prev) => ({ ...prev, [insightId]: "" }))
+
+		// Submit to database
+		commentFetcher.submit(
+			{ insightId, comment: commentText, projectId },
+			{
+				method: "post",
+				action: "/insights/api/add-comment",
+				encType: "application/json",
+			}
+		)
+	}
+
+	const _handleHide = async () => {
+		const insightId = validateInsightId(localInsight?.id)
+		if (!insightId || !projectId) {
+			consola.error("Cannot hide: missing insight ID or project ID", {
+				insightId,
+				projectId,
+			})
+			return
+		}
+
+		onDontShowMe()
+
+		// Submit to database
+		archiveFetcher.submit(
+			{ insightId, projectId, action: "hide" },
+			{
+				method: "post",
+				action: "/insights/api/archive",
+				encType: "application/json",
+			}
+		)
+	}
+
+	const _handleArchive = async () => {
+		const insightId = validateInsightId(localInsight?.id)
+		if (!insightId || !projectId) {
+			consola.error("Cannot archive: missing insight ID or project ID", {
+				insightId,
+				projectId,
+			})
+			return
+		}
+
+		onArchive()
+
+		// Submit to database
+		archiveFetcher.submit(
+			{ insightId, projectId, action: "archive" },
+			{
+				method: "post",
+				action: "/insights/api/archive",
+				encType: "application/json",
+			}
+		)
+	}
+
+	const _toggleComments = () => {
+		const insightId = validateInsightId(localInsight?.id)
+		if (!insightId) {
+			consola.error("toggleComments: invalid insight ID", { localInsight })
+			return
+		}
+		setShowComments((prev) => ({
+			...prev,
+			[insightId]: !prev[insightId],
+		}))
+	}
+
+	return (
+		<Card className="flex flex-col border-0 bg-background text-foreground shadow-lg transition-all duration-300 hover:shadow-xl">
+			<CardHeader className="pb-4">
+				{/* Name field with Stage and Category on same row */}
+				<div className="mb-3 flex items-start justify-between gap-4">
+					<div className="w-3/4 flex-1">
+						{/* Pain */}
+						<div>
+							{/* <h4 className="mb-1 text-gray-500 text-xs uppercase">Pain Point</h4> */}
+							<InlineEdit
+								value={localInsight.pain || ""}
+								onSubmit={async (newValue: string) => {
+									setLocalInsight((prev) => ({ ...prev, pain: newValue }))
+									await handleSaveField("pain", newValue)
+								}}
+								textClassName="text-foreground text-xl"
+								inputClassName="text-sm"
+								submitOnBlur
+								autoFocus={false}
+								showEditButton={false}
+								multiline
+								placeholder="What pain or friction does the user experience?"
+							/>
+						</div>
+						<div className="mt-2 flex flex-row py-4">
+							{/* <div className="font-light text-xs">Category</div> */}
+							<Badge
+								variant="outline"
+								className={getCategoryColor(localInsight.category || "")}
+								onClick={() => onTagClick(localInsight.category || "")}
+							>
+								{localInsight.category || ""}
+							</Badge>
+							<EditableField
+								field="name"
+								className="ml-2 font-thin text-foreground/60 text-md"
+								placeholder="Enter insight name"
+							/>
+						</div>
+					</div>
+					<div className="flex w-1/4 flex-col gap-2">
+						<div className="flex flex-col gap-1">
+							<div className="font-light text-foreground/70 text-xs">Stage</div>
+							<Badge
+								variant="outline"
+								className={getJourneyStageColor(localInsight.journey_stage || "")}
+								onClick={() => onTagClick(localInsight.journey_stage || "")}
+							>
+								{localInsight.journey_stage || ""}
+							</Badge>
+						</div>
+					</div>
+				</div>
+			</CardHeader>
+
+			<CardContent className="flex-1 space-y-4">
+				<div className="space-y-3">
+					{/* Evidence */}
+					<div className="rounded-r-md border-blue-400 bg-blue-50 p-3">
+						<div className="flex items-start gap-2">
+							<QuoteIcon className="mt-0.5 h-4 w-4 flex-shrink-0" />
+							<div className="flex-1">
+								<h4 className="mb-1 font-medium text-blue-700 text-xs dark:text-blue-300">Evidence</h4>
+								<InlineEdit
+									value={localInsight.evidence || ""}
+									onSubmit={async (newValue: string) => {
+										setLocalInsight((prev) => ({
+											...prev,
+											evidence: newValue,
+										}))
+										await handleSaveField("evidence", newValue)
+									}}
+									textClassName="font-medium text-blue-800 dark:text-blue-200 text-sm leading-relaxed"
+									inputClassName="text-sm"
+									submitOnBlur
+									autoFocus={false}
+									showEditButton={false}
+									multiline
+									placeholder="Supporting quote or evidence"
+								/>
+							</div>
+						</div>
+					</div>
+
+					{/* Details */}
+					<div>
+						<h4 className="mb-1 text-foreground/60 text-xs uppercase">Context & Details</h4>
+						<InlineEdit
+							value={localInsight.details || ""}
+							onSubmit={async (newValue: string) => {
+								setLocalInsight((prev) => ({ ...prev, details: newValue }))
+								await handleSaveField("details", newValue)
+							}}
+							textClassName="text-gray-900 text-md"
+							inputClassName="text-sm"
+							submitOnBlur
+							autoFocus={false}
+							showEditButton={false}
+							multiline
+							placeholder="Additional context and details"
+						/>
+					</div>
+
+					{/* Desired Outcome */}
+					<div>
+						<h4 className="mb-1 text-foreground/60 text-xs uppercase">Desired Outcome</h4>
+						<InlineEdit
+							value={localInsight.desired_outcome || ""}
+							onSubmit={async (newValue: string) => {
+								setLocalInsight((prev) => ({
+									...prev,
+									desired_outcome: newValue,
+								}))
+								await handleSaveField("desired_outcome", newValue)
+							}}
+							textClassName="text-gray-900 text-md"
+							inputClassName="text-sm"
+							submitOnBlur
+							autoFocus={false}
+							showEditButton={false}
+							multiline
+							placeholder="What outcome does the user want to achieve?"
+						/>
+					</div>
+
+					{/* Emotional Response */}
+					{localInsight.emotional_response && (
+						<div>
+							<h4 className="mb-1 text-foreground/60 text-xs uppercase">Emotional Response</h4>
+							<InlineEdit
+								value={localInsight.emotional_response || ""}
+								onSubmit={async (newValue: string) => {
+									setLocalInsight((prev) => ({
+										...prev,
+										emotional_response: newValue,
+									}))
+									await handleSaveField("emotional_response", newValue)
+								}}
+								textClassName="text-gray-900 text-md"
+								inputClassName="text-sm"
+								submitOnBlur
+								autoFocus={false}
+								showEditButton={false}
+								multiline
+								placeholder="Emotional response level"
+							/>
+						</div>
+					)}
+
+					{/* Underlying Motivation */}
+					{localInsight.motivation && (
+						<div>
+							<h4 className="mb-1 text-foreground/60 text-xs uppercase">Underlying Motivation</h4>
+							<InlineEdit
+								value={localInsight.motivation || ""}
+								onSubmit={async (newValue: string) => {
+									setLocalInsight((prev) => ({
+										...prev,
+										motivation: newValue,
+									}))
+									await handleSaveField("motivation", newValue)
+								}}
+								textClassName="text-gray-900 text-md"
+								inputClassName="text-sm"
+								submitOnBlur
+								autoFocus={false}
+								showEditButton={false}
+								multiline
+								placeholder="Underlying motivation"
+							/>
+						</div>
+					)}
+
+					{/* Impact and Novelty */}
+					<div className="flex items-center justify-between pt-2">
+						<div className="flex items-center gap-4">
+							<div className="flex items-center gap-1">
+								<TrendingUp className="h-4 w-4 text-red-500" />
+								<span className="font-medium text-foreground text-sm">Impact</span>
+								<div className="flex gap-1">
+									{[1, 2, 3, 4, 5].map((i) => (
+										<div
+											key={i}
+											className={`h-2 w-2 rounded-full ${
+												i <= (typeof localInsight.impact === "number" ? localInsight.impact : 0)
+													? "bg-red-500"
+													: "bg-muted"
+											}`}
+										/>
+									))}
+								</div>
+							</div>
+							<div className="flex items-center gap-1">
+								<Sparkles className="h-4 w-4 text-purple-500" />
+								<span className="font-medium text-foreground text-sm">Novelty</span>
+								<div className="flex gap-1">
+									{[1, 2, 3, 4, 5].map((i) => (
+										<div
+											key={i}
+											className={`h-2 w-2 rounded-full ${
+												i <= (localInsight.novelty || 0) ? "bg-purple-500" : "bg-muted"
+											}`}
+										/>
+									))}
+								</div>
+							</div>
+						</div>
+					</div>
+
+					{/* JTBD */}
+					<div className="rounded-r-md border-l-4 bg-slate-50 p-3">
+						<div className="flex items-start gap-2">
+							<CheckSquare className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-600" />
+							<div className="flex-1">
+								<h4 className="mb-1 font-medium text-blue-700 text-xs dark:text-blue-300">JTBD</h4>
+								<InlineEdit
+									value={localInsight.jtbd || ""}
+									onSubmit={async (newValue: string) => {
+										setLocalInsight((prev) => ({ ...prev, jtbd: newValue }))
+										await handleSaveField("jtbd", newValue)
+									}}
+									textClassName="font-medium text-blue-800 dark:text-blue-200 text-sm leading-relaxed"
+									inputClassName="text-sm"
+									submitOnBlur
+									autoFocus={false}
+									showEditButton={false}
+									multiline
+									placeholder="What job is the user trying to do?"
+								/>
+							</div>
+						</div>
+					</div>
+
+					{/* Confidence */}
+					{/* {localInsight.confidence && (
+						<div>
+							<h4 className="mb-1 text-gray-500 text-xs uppercase">Confidence</h4>
+							<div className="flex items-center gap-1">
+								<span className="font-medium text-sm">Confidence</span>
+								<div className="flex gap-1">
+									{[1, 2, 3, 4, 5].map((i) => (
+										<div
+											key={i}
+											className={`h-2 w-2 rounded-full ${
+												i <= (localInsight.confidence || 0) ? "bg-green-500" : "bg-gray-200"
+											}`}
+										/>
+									))}
+								</div>
+							</div>
+						</div>
+					)} */}
+
+					{/* Contradictions */}
+					{localInsight.contradictions && (
+						<div className="rounded-md border border-amber-200 bg-amber-50 p-2">
+							<div className="flex items-start gap-2">
+								<AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
+								<div className="flex-1">
+									<h4 className="font-medium text-amber-800 text-sm dark:text-amber-200">Contradictions</h4>
+									<EditableTextarea
+										table="insights"
+										id={localInsight.id}
+										field="contradictions"
+										initialValue={localInsight.contradictions || ""}
+										label=""
+										className="text-amber-700 text-xs"
+									/>
+								</div>
+							</div>
+						</div>
+					)}
+
+					{/* Related Tags */}
+					{localInsight.related_tags && localInsight.related_tags.length > 0 && (
+						<div>
+							<h4 className="mb-2 text-foreground/60 text-xs uppercase">Related Tags</h4>
+							<div className="flex flex-wrap gap-1">
+								{localInsight.related_tags.map((tag, index) => (
+									<Badge
+										key={`${tag}-${index}`}
+										variant="secondary"
+										className="cursor-pointer text-xs hover:bg-gray-200"
+										onClick={() => onTagClick(tag)}
+									>
+										{tag}
+									</Badge>
+								))}
+							</div>
+						</div>
+					)}
+				</div>
+
+				<Separator />
+
+				{/* <div>
+					<h4 className="mb-2 flex items-center gap-1 font-medium text-foreground text-sm">
+						<Users className="h-4 w-4" />
+						Source
+					</h4>
+					<div className="space-y-1">
+						{localInsight.interviews?.map((interview, index) => (
+							<div key={interview.id} className="flex justify-between text-gray-600 text-sm">
+								<span>{localInsight.personas?.[index]?.name || "Unknown Persona"}</span>
+								<span>{interview.participant}</span>
+							</div>
+						)) || "No interview data available"}
+					</div>
+				</div> */}
+
+				{localInsight.opportunity_ideas && localInsight.opportunity_ideas.length > 0 && (
+					<div className="rounded-lg border border-gray-200 bg-green-50 p-3">
+						<h4 className="mb-2 flex items-center gap-1 font-medium text-foreground text-sm">
+							<Lightbulb className="h-4 w-4" />
+							Opportunity Ideas
+						</h4>
+						<div className="space-y-2">
+							{localInsight.opportunity_ideas?.map((idea, index) => (
+								<div
+									key={`${idea}-${index}`}
+									className="flex items-center justify-between rounded-md border border-gray-100 bg-white p-2"
+								>
+									<span className="text-foreground text-sm">{idea}</span>
+									<Button
+										size="sm"
+										variant="ghost"
+										className="h-6 w-6 p-0 hover:bg-green-100"
+										title="Create Opportunity"
+									>
+										<div className="relative">
+											<Lightbulb className="h-3 w-3" />
+											<div className="-top-0.5 -right-0.5 absolute flex h-2 w-2 items-center justify-center rounded-full bg-green-500">
+												<span className="text-white text-xs leading-none">+</span>
+											</div>
+										</div>
+									</Button>
+								</div>
+							))}
+						</div>
+					</div>
+				)}
+
+				{/* Comments Section */}
+				{showComments[localInsight.id] && (
+					<div className="space-y-3 border-t pt-4">
+						<h4 className="font-medium text-foreground text-sm">Comments</h4>
+						<div className="max-h-40 space-y-2 overflow-y-auto">
+							{localInsight.comments?.map((comment) => (
+								<div key={comment.id} className="rounded-md bg-muted/50 p-2">
+									<div className="mb-1 flex items-start justify-between">
+										<span className="font-medium text-foreground text-xs">{comment.author || "Anonymous"}</span>
+										<span className="text-foreground/60 text-xs">
+											{new Date(comment.timestamp || comment.created_at || "").toLocaleDateString()}
+										</span>
+									</div>
+									<p className="text-foreground/80 text-sm">{comment.text || comment.content}</p>
+								</div>
+							))}
+						</div>
+						<div className="flex gap-2">
+							<Input
+								placeholder="Add a comment..."
+								value={newComments[localInsight.id] || ""}
+								onChange={(e) =>
+									setNewComments((prev) => ({
+										...prev,
+										[localInsight.id]: e.target.value,
+									}))
+								}
+								onKeyDown={(e) => {
+									if (e.key === "Enter") {
+										handleAddComment()
+									}
+								}}
+								className="flex-1"
+							/>
+							<Button size="sm" onClick={handleAddComment} disabled={!newComments[localInsight.id]?.trim()}>
+								<Send className="h-4 w-4" />
+							</Button>
+						</div>
+					</div>
+				)}
+			</CardContent>
+
+			<CardFooter className="border-t bg-background/50 pt-4">
+				<EntityInteractionPanel entityType="insight" entityId={insight.id} />
+			</CardFooter>
+		</Card>
+	)
+}
